@@ -1,3 +1,5 @@
 *.DS_Store
+__pycache__/
 datasets/signals.geojson
 datasets/location.geojson
+datasets/_old/

@@ -1,11 +1,19 @@
 num_classes: 2
 lr: 0.0001
 num_epochs: 1000
-weight_decay: 0
-filter_size: 4
-hidden_features: 64
+weight_decay: 0.00001
+hidden_features: 32
 split:
   seed: 31
-  train_ratio: 0.6
-  test_ratio: 0.4
+  train_ratio: 0.8
+  test_ratio: 0.2
   val_ratio: 0.0
+feat: 'sig'
+sig:
+  depth: 4
+  normalize: true
+  log_signature: false
+  time_augment: false
+  lead_lag: true
+rand:
+  seed: 42

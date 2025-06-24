@@ -1,24 +1,13 @@
 paths:
-  data:
-    site_path: ../datasets/location.geojson
-    data_path: ../datasets/signals.geojson
-    label_path: ../datasets/labels.json
-    rast_path: ../datasets/interface.grd
-    poly_path: ../datasets/region.geojson
+  data: datasets/signals.geojson
+  label: datasets/labels.json
 data:
-  start_date: 2008-01-01 11:59:00+0000
-  end_date: 2023-12-31 11:59:00+0000
-  download: false
+  start_date: 2020-01-01 11:59:00+0000
+  end_date: 2024-12-31 11:59:00+0000
+  download: true
   load: true
-  normalize: true
+  normalize: false
 graph:
-  k:
-  r: 60000
-  lag:
-sig:
-  depth: 3
-  normalize: true
-  log_signature: false
-  time_augment: false
-  lead_lag: false
+  k: 4
+  r:
 

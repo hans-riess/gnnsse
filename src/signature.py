@@ -75,3 +75,35 @@ class SignatureFeatures(T.BaseTransform):
         # Create the static graph dataset with transformed features
         dataset_static = GeometricGraph(x=x, y=y, edge_index=dataset.edge_index, edge_weight=dataset.edge_weight, pos=pos)
         return dataset_static
+
+
+class RandomFeatures(T.BaseTransform):
+    def __init__(self, feature_dim=10, normalize=True, seed=None):
+        super().__init__()
+        self.feature_dim = feature_dim
+        self.normalize = normalize
+        self.seed = seed
+
+    def forward(self, dataset: StaticGraphTemporalSignal) -> Data:
+        y = dataset[-1].y
+        pos = dataset[-1].pos
+
+        # Set random seed for reproducibility if provided
+        if self.seed is not None:
+            torch.manual_seed(self.seed)
+            np.random.seed(self.seed)
+
+        # Generate random uncorrelated features for each node
+        # Using normal distribution to ensure features are uncorrelated
+        x = torch.randn(dataset.num_nodes, self.feature_dim)
+
+        # Normalize if required
+        if self.normalize:
+            std_x = torch.std(x, dim=0)
+            mean_x = torch.mean(x, dim=0)
+            x = (x - mean_x) / std_x
+
+        # Create the static graph dataset with random features
+        dataset_static = GeometricGraph(x=x, y=y, edge_index=dataset.edge_index, edge_weight=dataset.edge_weight, pos=pos)
+        return dataset_static
+
