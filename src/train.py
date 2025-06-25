@@ -30,8 +30,8 @@ def train(config, hyper, device='cpu', verbose=False):
     )
 
     # Generate graph
-    data = dataloader.get_graph(k=config['graph']['k'],
-                                r=config['graph']['r'])
+    data = dataloader.get_graph(k=hyper['graph']['k'],
+                                r=hyper['graph']['r'])
     
     # Apply normalization transform
     normalize_transform = TemporalGraphNormalize(normalize=True, fill_nan='both')
@@ -46,7 +46,7 @@ def train(config, hyper, device='cpu', verbose=False):
         )
     
     random_transform = RandomFeatures(
-            feature_dim=signature_channels(3, hyper['sig']['depth']),  # Number of random features per node
+            feature_dim=  hyper['rand']['num_features'],  # Number of random features per node
             normalize=True,  # Whether to normalize the features
             seed=hyper['rand']['seed']  # Random seed for reproducibility
         )
@@ -73,9 +73,9 @@ def train(config, hyper, device='cpu', verbose=False):
     static_graph = static_graph.to(device)
 
     # GCN model
-    model = ClassifierGCN(node_features=signature_channels(3, hyper['sig']['depth']),
+    model = ClassifierGCN(node_features=static_graph.num_node_features,
                           hidden_features=hyper['hidden_features'],
-                          num_classes=hyper['num_classes'])
+                          num_classes=2)
     model = model.to(device)
 
     # Training parameters

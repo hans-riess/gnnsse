@@ -1,7 +1,6 @@
-num_classes: 2
-lr: 0.0001
+lr: 0.001
 num_epochs: 1000
-weight_decay: 0.00001
+weight_decay: 0.01
 hidden_features: 32
 split:
   seed: 31
@@ -9,11 +8,15 @@ split:
   test_ratio: 0.2
   val_ratio: 0.0
 feat: 'sig'
+graph:
+  k: 4
+  r: 
 sig:
   depth: 4
   normalize: true
   log_signature: false
   time_augment: false
-  lead_lag: true
+  lead_lag: false
 rand:
+  num_features: 120
   seed: 42

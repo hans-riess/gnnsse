@@ -17,7 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Run SSE-GNN experiments')
     
     # Configuration files
-    parser.add_argument('--config', type=str, default='configs/base.yaml',
+    parser.add_argument('--config', type=str, default='configs/data.yaml',
                        help='Path to base configuration file')
     parser.add_argument('--hyper', type=str, default='configs/hyper.yaml',
                        help='Path to hyperparameter configuration file')
@@ -78,12 +78,7 @@ def setup_device(device_str):
 
 def update_config(config, args):
     """Update configuration with command line arguments."""
-    if args.sig_depth is not None:
-        config['sig']['depth'] = args.sig_depth
-    if args.k is not None:
-        config['graph']['k'] = args.k
-    if args.r is not None:
-        config['graph']['r'] = args.r
+
     return config
 
 
@@ -103,6 +98,12 @@ def update_hyper(hyper, args):
         hyper['split']['val_ratio'] = args.val_ratio
     if args.seed is not None:
         hyper['split']['seed'] = args.seed
+    if args.sig_depth is not None:
+        hyper['sig']['depth'] = args.sig_depth
+    if args.k is not None:
+        hyper['graph']['k'] = args.k
+    if args.r is not None:
+        hyper['graph']['r'] = args.r
     return hyper
 
 
@@ -112,7 +113,7 @@ def save_experiment_results(output_dir, experiment_name, config, hyper, results)
     experiment_dir.mkdir(parents=True, exist_ok=True)
     
     # Save configuration
-    with open(experiment_dir / 'config.yaml', 'w') as f:
+    with open(experiment_dir / 'data.yaml', 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
     
     with open(experiment_dir / 'hyper.yaml', 'w') as f:
@@ -159,8 +160,8 @@ def main():
     if args.verbose:
         print("Configuration:")
         print(f"  Signature depth: {hyper['sig']['depth']}")
-        print(f"  Graph k: {config['graph']['k']}")
-        print(f"  Graph r: {config['graph']['r']}")
+        print(f"  Graph k: {hyper['graph']['k']}")
+        print(f"  Graph r: {hyper['graph']['r']}")
         print(f"  Hidden features: {hyper['hidden_features']}")
         print(f"  Learning rate: {hyper['lr']}")
         print(f"  Epochs: {hyper['num_epochs']}")

@@ -3,3 +3,7 @@ __pycache__/
 datasets/signals.geojson
 datasets/location.geojson
 datasets/_old/
+results//*.yaml
+results//*.json
+*.ipynb
+src/__pycache__/

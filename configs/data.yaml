@@ -6,8 +6,3 @@ data:
   end_date: 2024-12-31 11:59:00+0000
   download: true
   load: true
-  normalize: false
-graph:
-  k: 4
-  r:
-

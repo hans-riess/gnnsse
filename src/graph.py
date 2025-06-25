@@ -5,18 +5,6 @@ from torch_geometric.data import Data
 import torch_geometric_temporal as tgnn
 from typing import Union
 
-class GraphKernel(T.BaseTransform):
-    def __init__(self,bandwith=None):
-        self.distances = T.Distance(norm=False)
-        self.bandwidth = bandwith
-    
-    def forward(self, graph: Data)->Data:
-        graph = self.distances(graph)
-        if self.bandwidth == None:
-            self.bandwidth = torch.std(graph.edge_attr)
-        graph.edge_attr = torch.exp(-torch.sum(graph.edge_attr**2,dim=-1)/self.bandwidth**2).float()
-        return graph
-
 class GeometricGraph(Data):
     def __init__(self, edge_index, x, y, edge_weight,pos):
         super().__init__(edge_index=edge_index, edge_attr=edge_weight,x=x,y=y,pos=pos)

@@ -16,7 +16,6 @@ class DataLoader(object):
     end_date: end date of the data
     download: whether to (re)download the data from the Tilde API
     load: whether to load the data from the .geojson files
-    normalize: whether to normalize the data
     '''
     def __init__(self,
                  data_path,
@@ -32,7 +31,7 @@ class DataLoader(object):
         self.label_path = label_path
         self.data_path = data_path
         self.debug = debug
-        with open('datasets/labels.json', 'r') as f:
+        with open(self.label_path, 'r') as f:
             self.labels = json.load(f)
         if download:
             self.download()
@@ -109,10 +108,13 @@ class DataLoader(object):
             df: pandas dataframe with the data
             gdf_location: geopandas dataframe with the site locations
         '''
+
+        print('Loading data from file...')
+
         import geopandas as gpd
         self.df = gpd.read_file(self.data_path,driver='GeoJSON')
 
-    def get_graph(self, k=None, r=None, normalize=False):
+    def get_graph(self, k=None, r=None):
         '''
         Build a temporal graph dataset from the dataframe.
         Each node is a site, each time step is a measurement timestamp.
@@ -122,6 +124,8 @@ class DataLoader(object):
         from torch_geometric.data import Data
         import torch_geometric.transforms as T
         import numpy as np
+
+        print('Building graph...')
 
         # 1. Get unique siteIDs and their positions
         site_meta = self.df.drop_duplicates('siteID')[['siteID', 'geometry']]
@@ -146,10 +150,7 @@ class DataLoader(object):
         timestamps = sorted(self.df['t'].unique())
         for t in timestamps:
             group = self.df[self.df['t'] == t].set_index('siteID').reindex(siteIDs)
-            if normalize and all(col in group.columns for col in ['e_n', 'n_n', 'u_n']):
-                x = np.stack([group['e_n'].values, group['n_n'].values, group['u_n'].values], axis=1)
-            else:
-                x = np.stack([group['e'].values, group['n'].values, group['u'].values], axis=1)
+            x = np.stack([group['e'].values, group['n'].values, group['u'].values], axis=1)
             features.append(x)
 
         # 4. Prepare labels as targets (same for all time steps)
