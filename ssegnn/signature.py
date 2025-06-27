@@ -4,7 +4,7 @@ from torch import Tensor
 import torch_geometric.transforms as T
 from torch_geometric.data import Data
 from signatory import Signature, LogSignature
-from src.graph import StaticGraphTemporalSignal, GeometricGraph
+from ssegnn.graph import StaticGraphTemporalSignal, GeometricGraph
 import numpy as np
 
 class SignatureFeatures(T.BaseTransform):

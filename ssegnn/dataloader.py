@@ -1,6 +1,6 @@
 #last updated: 24/06/2025
 
-from src.graph import StaticGraphTemporalSignal
+from ssegnn.graph import StaticGraphTemporalSignal
 import pandas as pd
 import requests
 from tqdm import tqdm
