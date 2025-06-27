@@ -1,10 +1,10 @@
 import torch
-from src.config import load_config
+from ssegnn.config import load_config
 from signatory import signature_channels
-from src.graph import NodeSplitMask, TemporalGraphNormalize
-from src.model import ClassifierGCN
-from src.dataloader import DataLoader
-from src.signature import SignatureFeatures, RandomFeatures
+from ssegnn.graph import NodeSplitMask, TemporalGraphNormalize
+from ssegnn.model import ClassifierGCN
+from ssegnn.dataloader import DataLoader
+from ssegnn.signature import SignatureFeatures, RandomFeatures
 
 
 def train(config, hyper, device='cpu', verbose=False):

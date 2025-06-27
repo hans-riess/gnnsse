@@ -7,9 +7,9 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-from src.dataloader import DataLoader
-from src.train import train
-from src.config import load_config
+from ssegnn.dataloader import DataLoader
+from ssegnn.train import train
+from ssegnn.config import load_config
 
 
 def parse_args():
@@ -180,10 +180,6 @@ def main():
     except Exception as e:
         print(f"Experiment failed with error: {e}")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
 
 
 

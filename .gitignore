@@ -1,9 +1,13 @@
 *.DS_Store
-__pycache__/
+*.pyc
 datasets/signals.geojson
 datasets/location.geojson
 datasets/_old/
+datasets/_test/
+configs/_test
 results//*.yaml
 results//*.json
 *.ipynb
 src/__pycache__/
+venv/
+requirements/

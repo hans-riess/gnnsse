@@ -114,6 +114,8 @@ class DataLoader(object):
         import geopandas as gpd
         self.df = gpd.read_file(self.data_path,driver='GeoJSON')
 
+        print('Done!')
+
     def get_graph(self, k=None, r=None):
         '''
         Build a temporal graph dataset from the dataframe.
@@ -159,6 +161,7 @@ class DataLoader(object):
         labels = torch.tensor(labels,dtype=torch.double)
         targets = [labels for _ in timestamps]
 
+        print('Done!')
         # 5. Return the StaticGraphTemporalSignal object
         return StaticGraphTemporalSignal(
             edge_index=graph.edge_index,

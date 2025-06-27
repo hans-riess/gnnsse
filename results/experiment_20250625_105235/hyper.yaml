@@ -1,0 +1,22 @@
+feat: sig
+graph:
+  k: 4
+  r: null
+hidden_features: 32
+lr: 0.001
+num_epochs: 1000
+rand:
+  num_features: 120
+  seed: 42
+sig:
+  depth: 4
+  lead_lag: false
+  log_signature: false
+  normalize: true
+  time_augment: false
+split:
+  seed: 31
+  test_ratio: 0.2
+  train_ratio: 0.8
+  val_ratio: 0.0
+weight_decay: 0.01
