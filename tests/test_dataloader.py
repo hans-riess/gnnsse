@@ -5,7 +5,7 @@ import pytest
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-from src.dataloader import DataLoader
+from ssegnn.dataloader import DataLoader
 
 # Minimal test label set
 TEST_LABELS = [

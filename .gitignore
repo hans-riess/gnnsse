@@ -11,3 +11,4 @@ results//*.json
 src/__pycache__/
 venv/
 requirements/
+_scrap/
