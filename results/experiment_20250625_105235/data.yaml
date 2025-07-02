@@ -1,8 +1,0 @@
-data:
-  download: true
-  end_date: 2024-12-31 11:59:00+0000
-  load: true
-  start_date: 2020-01-01 11:59:00+0000
-paths:
-  data: datasets/signals.geojson
-  label: datasets/labels.json

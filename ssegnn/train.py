@@ -1,17 +1,16 @@
 import torch
 from ssegnn.config import load_config
-from signatory import signature_channels
 from ssegnn.graph import NodeSplitMask, TemporalGraphNormalize
 from ssegnn.model import ClassifierGCN
 from ssegnn.dataloader import DataLoader
 from ssegnn.signature import SignatureFeatures, RandomFeatures
 
 
-def train(config, hyper, device='cpu', verbose=False):
+def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
     """
     Args:
-        config: Base configuration dictionary
-        hyper: Hyperparameter configuration dictionary
+        data_config: Data configuration dictionary
+        hyper_config: Hyperparameter configuration dictionary
         device: Device to use for training ('cpu' or 'cuda')
         verbose: Whether to print verbose output
     
@@ -20,51 +19,66 @@ def train(config, hyper, device='cpu', verbose=False):
     """
     # Load the data
     dataloader = DataLoader(
-        label_path=config['paths']['label'],
-        data_path=config['paths']['data'],
-        start_date=config['data']['start_date'],
-        end_date=config['data']['end_date'],
-        download=config['data']['download'],
-        load=config['data']['load'],
-        debug=False
+        label_path=data_config['paths']['label'],
+        data_path=data_config['paths']['data'],
+        start_date=data_config['data']['start_date'],
+        end_date=data_config['data']['end_date'],
+        download=data_config['data']['download'],
+        from_file=data_config['data']['from_file'],
+        verbose=verbose,
+        debug=debug,
     )
 
     # Generate graph
-    data = dataloader.get_graph(k=hyper['graph']['k'],
-                                r=hyper['graph']['r'])
+    data = dataloader.get_graph(k=hyper_config['graph']['k'],
+                                r=hyper_config['graph']['r'])
     
     # Apply normalization transform
     normalize_transform = TemporalGraphNormalize(normalize=True, fill_nan='both')
     data = normalize_transform(data)
     
     sig_transform = SignatureFeatures(
-            sig_depth=hyper['sig']['depth'],
-            normalize=hyper['sig']['normalize'],
-            log_signature=hyper['sig']['log_signature'],
-            time_augment=hyper['sig']['time_augment'],
-            lead_lag=hyper['sig']['lead_lag']
+            sig_depth=hyper_config['sig']['depth'],
+            normalize=hyper_config['sig']['normalize'],
+            log_signature=hyper_config['sig']['log_signature'],
+            time_augment=hyper_config['sig']['time_augment'],
+            lead_lag=hyper_config['sig']['lead_lag']
         )
     
     random_transform = RandomFeatures(
-            feature_dim=  hyper['rand']['num_features'],  # Number of random features per node
+            feature_dim=  hyper_config['rand']['num_features'],  # Number of random features per node
             normalize=True,  # Whether to normalize the features
-            seed=hyper['rand']['seed']  # Random seed for reproducibility
+            seed=hyper_config['rand']['seed']  # Random seed for reproducibility
         )
 
-    if hyper['feat'] == 'sig':
-        # Apply the transform to your temporal graph data
+    # Apply the transform to your temporal graph data
+    if hyper_config['feat'] == 'sig':
         static_graph = sig_transform(data)
-    elif hyper['feat'] == 'rand':
-        # Apply the transform to ignore temporal information
+    elif hyper_config['feat'] == 'rand':
         static_graph = random_transform(data)
     else:
-        raise ValueError(f"Unknown feature type: {hyper['feat']}. Must be 'sig' or 'rand'")
+        raise ValueError(f"Unknown feature type: {hyper_config['feat']}. Must be 'sig' or 'rand'")
+
+    # Debug: Check for NaNs in features, labels, and edge attributes
+    if debug:
+        if torch.isnan(static_graph.x).any():
+            print("[DEBUG] NaN detected in node features!")
+            print(static_graph.x)
+            raise ValueError("NaN in node features")
+        if torch.isnan(static_graph.y).any():
+            print("[DEBUG] NaN detected in labels!")
+            print(static_graph.y)
+            raise ValueError("NaN in labels")
+        if hasattr(static_graph, 'edge_attr') and static_graph.edge_attr is not None and torch.isnan(static_graph.edge_attr).any():
+            print("[DEBUG] NaN detected in edge attributes!")
+            print(static_graph.edge_attr)
+            raise ValueError("NaN in edge attributes")
 
     # Split the nodes
-    split_transform = NodeSplitMask(train_ratio=hyper['split']['train_ratio'],
-                                    val_ratio=hyper['split']['val_ratio'],
-                                    test_ratio=hyper['split']['test_ratio'],
-                                    seed=hyper['split']['seed'])
+    split_transform = NodeSplitMask(train_ratio=hyper_config['split']['train_ratio'],
+                                    val_ratio=hyper_config['split']['val_ratio'],
+                                    test_ratio=hyper_config['split']['test_ratio'],
+                                    seed=hyper_config['split']['seed'])
     
     # Apply the transform to static graph
     static_graph = split_transform(static_graph)
@@ -74,14 +88,14 @@ def train(config, hyper, device='cpu', verbose=False):
 
     # GCN model
     model = ClassifierGCN(node_features=static_graph.num_node_features,
-                          hidden_features=hyper['hidden_features'],
+                          hidden_features=hyper_config['hidden_features'],
                           num_classes=2)
     model = model.to(device)
 
     # Training parameters
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=hyper['lr'],
-                                 weight_decay=hyper['weight_decay'])
+                                 lr=hyper_config['lr'],
+                                 weight_decay=hyper_config['weight_decay'])
     criterion = torch.nn.CrossEntropyLoss()
 
     # Training loop
@@ -89,7 +103,7 @@ def train(config, hyper, device='cpu', verbose=False):
     train_accuracies = []
     val_accuracies = []
     
-    for epoch in range(int(hyper['num_epochs'])):
+    for epoch in range(int(hyper_config['num_epochs'])):
         model.train()
         optimizer.zero_grad()
         out = model(static_graph.x, static_graph.edge_index, static_graph.edge_attr)
@@ -134,12 +148,3 @@ def train(config, hyper, device='cpu', verbose=False):
     }
     
     return results
-
-# For backward compatibility - if run directly, use default configs
-if __name__ == "__main__":
-    # Configuration files
-    config = load_config('configs/base.yaml')
-    hyper = load_config('configs/hyper.yaml')
-    
-    results = train(config, hyper, device='cpu', verbose=True)
-    print(f"Test Accuracy: {results['test_accuracy']:.4f}")

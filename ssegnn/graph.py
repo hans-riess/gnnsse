@@ -36,18 +36,8 @@ class StaticGraphTemporalSignal(tgnn.signal.StaticGraphTemporalSignal):
             else:
                 return torch.tensor(target, dtype=torch.double)
     
-    def _get_positions(self,time_index: int):
-        if self.positions is None:
-            return self.positions
-        else:
-            if self.positions[time_index] is None:
-                return self.positions[time_index]
-            else:
-                pos = self.positions[time_index]
-                if isinstance(pos, torch.Tensor):
-                    return pos.float()
-                else:
-                    return torch.tensor(pos, dtype=torch.float)
+    def _get_positions(self, time_index: int = None):
+        return self.positions
         
     def __getitem__(self, time_index: Union[int, slice]):
         if isinstance(time_index, slice):
@@ -56,7 +46,7 @@ class StaticGraphTemporalSignal(tgnn.signal.StaticGraphTemporalSignal):
                 self.edge_weight,
                 self.features[time_index],
                 self.targets[time_index],
-                self.positions[time_index],
+                self.positions,
                 **{key: getattr(self, key)[time_index] for key in self.additional_feature_keys}
             )
         else:
@@ -64,7 +54,7 @@ class StaticGraphTemporalSignal(tgnn.signal.StaticGraphTemporalSignal):
             edge_index = self._get_edge_index()
             edge_weight = self._get_edge_weight()
             y = self._get_target(time_index)
-            pos = self._get_positions(time_index)
+            pos = self._get_positions()
             additional_features = self._get_additional_features(time_index)
 
             snapshot = Data(x=x, edge_index=edge_index, edge_attr=edge_weight,
