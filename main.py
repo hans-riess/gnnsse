@@ -7,9 +7,9 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-from src.dataloader import DataLoader
-from src.train import train
-from src.config import load_config
+from ssegnn.dataloader import DataLoader
+from ssegnn.train import train
+from ssegnn.config import load_config
 
 
 def parse_args():
@@ -17,42 +17,45 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Run SSE-GNN experiments')
     
     # Configuration files
-    parser.add_argument('--config', type=str, default='configs/data.yaml',
-                       help='Path to base configuration file')
-    parser.add_argument('--hyper', type=str, default='configs/hyper.yaml',
+    parser.add_argument('--data-config', type=str, default='configs/data.yaml',
+                       help='Path to data configuration file')
+    parser.add_argument('--hyper-config', type=str, default='configs/hyper.yaml',
                        help='Path to hyperparameter configuration file')
+    
+    parser.add_argument('--download', action='store_true',
+                       help='Download data from Tilde API')
+    parser.add_argument('--from-file', action='store_true',
+                       help='Load data from file')
     
     # Experiment settings
     parser.add_argument('--experiment-name', type=str, default=None,
                        help='Name for this experiment (default: timestamp)')
-    parser.add_argument('--output-dir', type=str, default='results',
+    parser.add_argument('--output-dir', type=str, default='experiments',
                        help='Directory to save experiment results')
     parser.add_argument('--seed', type=int, default=None,
-                       help='Random seed for reproducibility')
+                       help='Random seed for training')
     
     # Model parameters (can override config)
     parser.add_argument('--sig-depth', type=int, default=None,
-                       help='Signature depth (overrides config)')
+                       help='Signature depth (overrides hyper.yaml)')
     parser.add_argument('--hidden-features', type=int, default=None,
-                       help='Hidden features (overrides config)')
+                       help='Hidden features (overrides hyper.yaml)')
+    parser.add_argument('--weight-decay', type=float, default=None,
+                       help='Weight decay (overrides hyper.yaml)')
     parser.add_argument('--lr', type=float, default=None,
-                       help='Learning rate (overrides config)')
+                       help='Learning rate (overrides hyper.yaml)')
     parser.add_argument('--num-epochs', type=int, default=None,
-                       help='Number of epochs (overrides config)')
+                       help='Number of epochs (overrides hyper.yaml)')
     
     # Data parameters
-    parser.add_argument('--train-ratio', type=float, default=None,
-                       help='Training split ratio (overrides config)')
-    parser.add_argument('--test-ratio', type=float, default=None,
-                       help='Test split ratio (overrides config)')
-    parser.add_argument('--val-ratio', type=float, default=None,
-                       help='Validation split ratio (overrides config)')
+    parser.add_argument('--split-seed', type=int, default=None,
+                       help='Random seed for split')
     
     # Graph parameters
     parser.add_argument('--k', type=int, default=None,
-                       help='K parameter for graph construction (overrides config)')
+                       help='K parameter for graph construction (overrides hyper.yaml)')
     parser.add_argument('--r', type=float, default=None,
-                       help='R parameter for graph construction (overrides config)')
+                       help='R parameter for graph construction (overrides hyper.yaml)')
     
     # Training options
     parser.add_argument('--device', type=str, default='auto',
@@ -61,6 +64,8 @@ def parse_args():
                        help='Save the trained model')
     parser.add_argument('--verbose', action='store_true',
                        help='Verbose output')
+    parser.add_argument('--debug', action='store_true',
+                       help='Debug mode')
     
     return parser.parse_args()
 
@@ -75,14 +80,7 @@ def setup_device(device_str):
     else:
         return torch.device(device_str)
 
-
-def update_config(config, args):
-    """Update configuration with command line arguments."""
-
-    return config
-
-
-def update_hyper(hyper, args):
+def update_config(data_config, hyper, args):
     """Update hyperparameters with command line arguments."""
     if args.hidden_features is not None:
         hyper['hidden_features'] = args.hidden_features
@@ -90,31 +88,31 @@ def update_hyper(hyper, args):
         hyper['lr'] = args.lr
     if args.num_epochs is not None:
         hyper['num_epochs'] = args.num_epochs
-    if args.train_ratio is not None:
-        hyper['split']['train_ratio'] = args.train_ratio
-    if args.test_ratio is not None:
-        hyper['split']['test_ratio'] = args.test_ratio
-    if args.val_ratio is not None:
-        hyper['split']['val_ratio'] = args.val_ratio
-    if args.seed is not None:
-        hyper['split']['seed'] = args.seed
+    if args.split_seed is not None:
+        hyper['split']['seed'] = args.split_seed
     if args.sig_depth is not None:
         hyper['sig']['depth'] = args.sig_depth
     if args.k is not None:
         hyper['graph']['k'] = args.k
     if args.r is not None:
         hyper['graph']['r'] = args.r
+    if args.weight_decay is not None:
+        hyper['weight_decay'] = args.weight_decay
+    if args.download is not None:
+        data_config['data']['download'] = args.download
+    if args.from_file is not None:
+        data_config['data']['from_file'] = args.from_file
     return hyper
 
 
-def save_experiment_results(output_dir, experiment_name, config, hyper, results):
+def save_experiment_results(output_dir, experiment_name, data_config, hyper, results):
     """Save experiment results and configuration."""
     experiment_dir = Path(output_dir) / experiment_name
     experiment_dir.mkdir(parents=True, exist_ok=True)
     
     # Save configuration
     with open(experiment_dir / 'data.yaml', 'w') as f:
-        yaml.dump(config, f, default_flow_style=False)
+        yaml.dump(data_config, f, default_flow_style=False)
     
     with open(experiment_dir / 'hyper.yaml', 'w') as f:
         yaml.dump(hyper, f, default_flow_style=False)
@@ -123,6 +121,7 @@ def save_experiment_results(output_dir, experiment_name, config, hyper, results)
     with open(experiment_dir / 'results.json', 'w') as f:
         json.dump(results, f, indent=2)
     
+    print('\n')
     print(f"Experiment results saved to: {experiment_dir}")
 
 
@@ -135,12 +134,11 @@ def main():
     print(f"Using device: {device}")
     
     # Load configurations
-    config = load_config(args.config)
-    hyper = load_config(args.hyper)
+    data_config = load_config(args.data_config)
+    hyper = load_config(args.hyper_config)
     
     # Update with command line arguments
-    config = update_config(config, args)
-    hyper = update_hyper(hyper, args)
+    hyper = update_config(data_config, hyper, args)
     
     # Set random seed if specified
     if args.seed is not None:
@@ -157,22 +155,12 @@ def main():
     
     print(f"Starting experiment: {experiment_name}")
     
-    if args.verbose:
-        print("Configuration:")
-        print(f"  Signature depth: {hyper['sig']['depth']}")
-        print(f"  Graph k: {hyper['graph']['k']}")
-        print(f"  Graph r: {hyper['graph']['r']}")
-        print(f"  Hidden features: {hyper['hidden_features']}")
-        print(f"  Learning rate: {hyper['lr']}")
-        print(f"  Epochs: {hyper['num_epochs']}")
-        print(f"  Train/Test/Val split: {hyper['split']['train_ratio']}/{hyper['split']['test_ratio']}/{hyper['split']['val_ratio']}")
-    
     try:
         # Run training
-        results = train(config, hyper, device=device, verbose=args.verbose)
+        results = train(data_config, hyper, device=device, verbose=args.verbose, debug=args.debug)
         
         # Save results
-        save_experiment_results(args.output_dir, experiment_name, config, hyper, results)
+        save_experiment_results(args.output_dir, experiment_name, data_config, hyper, results)
         
         print(f"Experiment completed successfully!")
         print(f"Final test accuracy: {results['test_accuracy']:.4f}")
@@ -184,14 +172,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-

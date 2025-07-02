@@ -3,7 +3,7 @@
 ## Requirements
 
 You will need the following Python packages:
-- signatory
+- esig
 - torch
 - torch_geometric
 - torch_geometric_temporal
@@ -13,7 +13,7 @@ You will need the following Python packages:
 Install the required packages individually:
 
 ```sh
-pip install signatory torch torch_geometric torch_geometric_temporal pandas
+pip install esig torch torch_geometric torch_geometric_temporal pandas
 ```
 
 If you encounter issues with torch or torch_geometric, refer to their official installation guides for platform-specific wheels.

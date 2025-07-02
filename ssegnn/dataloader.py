@@ -1,6 +1,6 @@
 #last updated: 24/06/2025
 
-from src.graph import StaticGraphTemporalSignal
+from ssegnn.graph import StaticGraphTemporalSignal
 import pandas as pd
 import requests
 from tqdm import tqdm
@@ -15,7 +15,7 @@ class DataLoader(object):
     start_date: start date of the data
     end_date: end date of the data
     download: whether to (re)download the data from the Tilde API
-    load: whether to load the data from the .geojson files
+    from_file: or not whether to load the data file
     '''
     def __init__(self,
                  data_path,
@@ -23,20 +23,37 @@ class DataLoader(object):
                  start_date=pd.Timestamp('2014-01-01 11:59:00+0000', tz='UTC'),
                  end_date=pd.Timestamp('2024-12-31 11:59:00+0000', tz='UTC'),
                  download=False,
-                 load = True,
+                 from_file = False,
                  debug = False,
+                 verbose = False,
                 ):
         self.start_date = pd.Timestamp(start_date, tz='UTC')
         self.end_date = pd.Timestamp(end_date, tz='UTC')
         self.label_path = label_path
         self.data_path = data_path
         self.debug = debug
+        self.verbose = verbose
         with open(self.label_path, 'r') as f:
             self.labels = json.load(f)
         if download:
             self.download()
-        if load:
             self.load_data()
+        elif from_file:
+            self.load_data()
+        else:
+            raise ValueError("Either download or from_file must be True")
+        
+        # Debug: Check for missing siteIDs in data
+        if self.debug and hasattr(self, 'df'):
+            label_siteIDs = set(entry['siteID'] for entry in self.labels)
+            data_siteIDs = set(self.df['siteID'].unique())
+            missing = label_siteIDs - data_siteIDs
+            if missing:
+                print(f"[DEBUG] Warning: {len(missing)} siteIDs in labels are missing from the data file:")
+                for site in sorted(missing):
+                    print(f"  - {site}")
+            else:
+                print("[DEBUG] All siteIDs in labels are present in the data file.")
 
     def download(self):
         import geopandas as gpd
@@ -50,8 +67,14 @@ class DataLoader(object):
         siteIDs = [entry['siteID'] for entry in self.labels]
 
         records = []
+        if self.verbose:
+            print('Downloading data...')
+            print(f'Number of sites: {len(siteIDs)}')
+            print(f'Start date: {start_date_str}')
+            print(f'End date: {end_date_str}')
+            print('\n')
 
-        for siteID in tqdm(siteIDs):
+        for siteID in tqdm(siteIDs, disable=not self.verbose):
             try:
                 # Fetch east, north, up
                 data = {}
@@ -96,10 +119,15 @@ class DataLoader(object):
             except Exception as e:
                 print(f"Error fetching data for site {siteID}: {e}")
                 continue
+        if self.verbose:
+            print('Saving data to file...')
 
         gdf = gpd.GeoDataFrame(records, geometry='geometry', crs="EPSG:4326")
         gdf.to_file(self.data_path, driver="GeoJSON")
         self.df = gdf
+
+        if self.verbose:
+            print('Done!')
 
     def load_data(self):
         '''
@@ -109,10 +137,15 @@ class DataLoader(object):
             gdf_location: geopandas dataframe with the site locations
         '''
 
-        print('Loading data from file...')
+        if self.verbose:
+            print('Loading data from file...')
 
         import geopandas as gpd
         self.df = gpd.read_file(self.data_path,driver='GeoJSON')
+
+        if self.verbose:
+            print('Done!')
+            print('\n')
 
     def get_graph(self, k=None, r=None):
         '''
@@ -125,7 +158,13 @@ class DataLoader(object):
         import torch_geometric.transforms as T
         import numpy as np
 
-        print('Building graph...')
+        if self.verbose:
+            if k is not None:
+                print(f'Building k-NN graph with k={k}...')
+            elif r is not None:
+                print(f'Building radius graph with r={int(r/1000)} km...')
+            else:
+                raise ValueError("Either k or r must be provided")
 
         # 1. Get unique siteIDs and their positions
         site_meta = self.df.drop_duplicates('siteID')[['siteID', 'geometry']]
@@ -151,19 +190,45 @@ class DataLoader(object):
         for t in timestamps:
             group = self.df[self.df['t'] == t].set_index('siteID').reindex(siteIDs)
             x = np.stack([group['e'].values, group['n'].values, group['u'].values], axis=1)
+            # Always fill NaNs
+            if np.isnan(x).any():
+                if self.debug:
+                    print(f"[DEBUG] NaNs detected and filled in features at timestamp {t}.")
+                # Forward fill along sites
+                for feat in range(x.shape[1]):
+                    mask = np.isnan(x[:, feat])
+                    for i in range(1, x.shape[0]):
+                        if mask[i] and not mask[i-1]:
+                            x[i, feat] = x[i-1, feat]
+                    # Backward fill
+                    mask = np.isnan(x[:, feat])
+                    for i in range(x.shape[0]-2, -1, -1):
+                        if mask[i] and not mask[i+1]:
+                            x[i, feat] = x[i+1, feat]
+                # Fill any remaining NaNs with zero
+                x = np.nan_to_num(x, nan=0.0)
             features.append(x)
 
         # 4. Prepare labels as targets (same for all time steps)
-        siteid_to_label = {entry['siteID']: entry['label'] for entry in self.labels}
-        labels = [siteid_to_label.get(siteID, 0) for siteID in siteIDs]  # default to 0 if not found
+        to_label = {entry['siteID']: entry['label'] for entry in self.labels}
+        labels = [to_label.get(siteID, 0) for siteID in siteIDs]  # default to 0 if not found
         labels = torch.tensor(labels,dtype=torch.double)
         targets = [labels for _ in timestamps]
 
-        # 5. Return the StaticGraphTemporalSignal object
-        return StaticGraphTemporalSignal(
+        graph =StaticGraphTemporalSignal(
             edge_index=graph.edge_index,
             edge_weight=graph.edge_attr,
             features=features,
             targets=targets,
             positions=positions
         )
+
+        if self.verbose:
+            print('Done!')
+            print('\n')
+            print(f"Number of nodes: {graph.num_nodes}")
+            print(f'Number of node features: {graph.num_node_features}')
+            print(f'Number of snapshots: {graph.snapshot_count}')
+            print(f'Number of edges: {graph.edge_index.shape[-1]}')
+            print('\n')
+        return graph

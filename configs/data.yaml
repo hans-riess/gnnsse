@@ -5,4 +5,4 @@ data:
   start_date: 2020-01-01 11:59:00+0000
   end_date: 2024-12-31 11:59:00+0000
   download: true
-  load: true
+  from_file:
