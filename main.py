@@ -10,6 +10,7 @@ import json
 from ssegnn.dataloader import DataLoader
 from ssegnn.train import train
 from ssegnn.config import load_config
+from ssegnn.visualization import generate_experiment_plots
 
 
 def parse_args():
@@ -105,7 +106,7 @@ def update_config(data_config, hyper, args):
     return hyper
 
 
-def save_experiment_results(output_dir, experiment_name, data_config, hyper, results):
+def save_experiment_results(output_dir, experiment_name, data_config, hyper, results, static_graph=None):
     """Save experiment results and configuration."""
     experiment_dir = Path(output_dir) / experiment_name
     experiment_dir.mkdir(parents=True, exist_ok=True)
@@ -120,6 +121,13 @@ def save_experiment_results(output_dir, experiment_name, data_config, hyper, res
     # Save results
     with open(experiment_dir / 'results.json', 'w') as f:
         json.dump(results, f, indent=2)
+    
+    # Generate and save all visualization plots
+    if static_graph is not None:
+        try:
+            generate_experiment_plots(results, static_graph, output_dir, experiment_name)
+        except Exception as e:
+            print(f"Warning: Failed to generate plots: {e}")
     
     print('\n')
     print(f"Experiment results saved to: {experiment_dir}")
@@ -157,13 +165,14 @@ def main():
     
     try:
         # Run training
-        results = train(data_config, hyper, device=device, verbose=args.verbose, debug=args.debug)
+        results, static_graph = train(data_config, hyper, device=device, verbose=args.verbose, debug=args.debug)
         
-        # Save results
-        save_experiment_results(args.output_dir, experiment_name, data_config, hyper, results)
+        # Save results and generate plots
+        save_experiment_results(args.output_dir, experiment_name, data_config, hyper, results, static_graph)
         
         print(f"Experiment completed successfully!")
         print(f"Final test accuracy: {results['test_accuracy']:.4f}")
+        print(f"Final test F1 score (weighted): {results['test_f1_weighted']:.4f}")
         
     except Exception as e:
         print(f"Experiment failed with error: {e}")
