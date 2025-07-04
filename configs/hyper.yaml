@@ -5,9 +5,9 @@ hidden_features: 32
 torch_seed: 42
 split:
   seed: 31
-  train_ratio: 0.8
-  test_ratio: 0.2
-  val_ratio: 0.0
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
 feat: 'sig'
 graph:
   k: 4

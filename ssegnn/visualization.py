@@ -30,6 +30,38 @@ def plot_training_loss(train_losses, save_path=None, title="Training Loss"):
     else:
         plt.show()
 
+def plot_training_validation_loss(train_losses, val_losses, save_path=None, title="Training vs Validation Loss"):
+    """
+    Plot training and validation loss together to assess generalization.
+    
+    Args:
+        train_losses: List of training loss values
+        val_losses: List of validation loss values
+        save_path: Path to save the plot (optional)
+        title: Title for the plot
+    """
+    plt.figure(figsize=(12, 6))
+    epochs = range(len(train_losses))
+    
+    plt.plot(epochs, train_losses, 'b-', linewidth=2, alpha=0.8, label='Training Loss')
+    
+    # Only plot validation loss if we have valid values
+    if val_losses and not all(np.isnan(val_losses)):
+        plt.plot(epochs, val_losses, 'r-', linewidth=2, alpha=0.8, label='Validation Loss')
+    
+    plt.title(title, fontsize=16, fontweight='bold')
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
 def plot_training_metrics(train_losses, train_accuracies, val_accuracies, save_path=None):
     """
     Plot training loss and accuracies in subplots.
@@ -59,6 +91,70 @@ def plot_training_metrics(train_losses, train_accuracies, val_accuracies, save_p
     ax2.set_ylabel('Accuracy', fontsize=12)
     ax2.legend()
     ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+def plot_comprehensive_training_metrics(train_losses, val_losses, train_accuracies, val_accuracies, save_path=None):
+    """
+    Plot comprehensive training metrics including both losses and accuracies.
+    
+    Args:
+        train_losses: List of training loss values
+        val_losses: List of validation loss values
+        train_accuracies: List of training accuracy values
+        val_accuracies: List of validation accuracy values
+        save_path: Path to save the plot (optional)
+    """
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+    epochs = range(len(train_losses))
+    
+    # Training and validation loss
+    ax1.plot(epochs, train_losses, 'b-', linewidth=2, alpha=0.8, label='Training Loss')
+    if val_losses and not all(np.isnan(val_losses)):
+        ax1.plot(epochs, val_losses, 'r-', linewidth=2, alpha=0.8, label='Validation Loss')
+    ax1.set_title('Training vs Validation Loss', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Epoch', fontsize=12)
+    ax1.set_ylabel('Loss', fontsize=12)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Training and validation accuracy
+    ax2.plot(epochs, train_accuracies, 'g-', linewidth=2, alpha=0.8, label='Training Accuracy')
+    if val_accuracies and not all(np.isnan(val_accuracies)):
+        ax2.plot(epochs, val_accuracies, 'orange', linewidth=2, alpha=0.8, label='Validation Accuracy')
+    ax2.set_title('Training vs Validation Accuracy', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Epoch', fontsize=12)
+    ax2.set_ylabel('Accuracy', fontsize=12)
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # Training loss only (zoomed view)
+    ax3.plot(epochs, train_losses, 'b-', linewidth=2, alpha=0.8)
+    ax3.set_title('Training Loss (Detailed)', fontsize=14, fontweight='bold')
+    ax3.set_xlabel('Epoch', fontsize=12)
+    ax3.set_ylabel('Loss', fontsize=12)
+    ax3.grid(True, alpha=0.3)
+    
+    # Generalization gap (difference between validation and training loss)
+    if val_losses and not all(np.isnan(val_losses)):
+        generalization_gap = [val_losses[i] - train_losses[i] for i in range(len(epochs)) if not np.isnan(val_losses[i])]
+        valid_epochs = [i for i in range(len(epochs)) if not np.isnan(val_losses[i])]
+        ax4.plot(valid_epochs, generalization_gap, 'purple', linewidth=2, alpha=0.8)
+        ax4.set_title('Generalization Gap (Val Loss - Train Loss)', fontsize=14, fontweight='bold')
+        ax4.set_xlabel('Epoch', fontsize=12)
+        ax4.set_ylabel('Loss Difference', fontsize=12)
+        ax4.grid(True, alpha=0.3)
+        ax4.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    else:
+        ax4.text(0.5, 0.5, 'No validation data available', transform=ax4.transAxes, 
+                ha='center', va='center', fontsize=12)
+        ax4.set_title('Generalization Gap', fontsize=14, fontweight='bold')
     
     plt.tight_layout()
     
@@ -284,7 +380,26 @@ def generate_experiment_plots(results, static_graph, output_dir, experiment_name
             title=f"Training Loss - {experiment_name}"
         )
     
-    # 2. Training metrics plot
+    # 2. Training vs Validation Loss plot
+    if 'train_losses' in results and 'val_losses' in results and results['train_losses']:
+        plot_training_validation_loss(
+            results['train_losses'],
+            results['val_losses'],
+            save_path=plots_dir / 'training_validation_loss.png',
+            title=f"Training vs Validation Loss - {experiment_name}"
+        )
+    
+    # 3. Comprehensive training metrics plot
+    if all(key in results for key in ['train_losses', 'val_losses', 'train_accuracies', 'val_accuracies']):
+        plot_comprehensive_training_metrics(
+            results['train_losses'],
+            results['val_losses'],
+            results['train_accuracies'], 
+            results['val_accuracies'],
+            save_path=plots_dir / 'comprehensive_training_metrics.png'
+        )
+    
+    # 4. Original training metrics plot (for compatibility)
     if all(key in results for key in ['train_losses', 'train_accuracies', 'val_accuracies']):
         plot_training_metrics(
             results['train_losses'],
@@ -293,7 +408,7 @@ def generate_experiment_plots(results, static_graph, output_dir, experiment_name
             save_path=plots_dir / 'training_metrics.png'
         )
     
-    # 3. Confusion matrix for test set
+    # 5. Confusion matrix for test set
     if 'test_predictions' in results and 'test_labels' in results:
         plot_confusion_matrix(
             results['test_labels'],
@@ -303,7 +418,7 @@ def generate_experiment_plots(results, static_graph, output_dir, experiment_name
             title=f"Test Set Confusion Matrix - {experiment_name}"
         )
     
-    # 4. Network visualization
+    # 6. Network visualization
     if all(key in results for key in ['test_predictions', 'test_labels']) and hasattr(static_graph, 'edge_index'):
         # Use test mask to get positions and predictions for test nodes only
         test_mask = static_graph.test_mask.cpu().numpy()
@@ -332,7 +447,7 @@ def generate_experiment_plots(results, static_graph, output_dir, experiment_name
                 title=f"Network Predictions vs Ground Truth - {experiment_name}"
             )
     
-    # 5. Save classification report
+    # 7. Save classification report
     if 'test_predictions' in results and 'test_labels' in results:
         save_classification_report(
             results['test_labels'],
@@ -342,3 +457,23 @@ def generate_experiment_plots(results, static_graph, output_dir, experiment_name
         )
     
     print(f"All plots saved to: {plots_dir}")
+    
+    # Print summary of generalization assessment
+    if 'val_losses' in results and results['val_losses'] and not all(np.isnan(results['val_losses'])):
+        final_train_loss = results['train_losses'][-1] if results['train_losses'] else 0
+        final_val_loss = results['val_losses'][-1] if results['val_losses'] else 0
+        if not np.isnan(final_val_loss):
+            generalization_gap = final_val_loss - final_train_loss
+            print(f"\nGeneralization Assessment:")
+            print(f"Final Training Loss: {final_train_loss:.4f}")
+            print(f"Final Validation Loss: {final_val_loss:.4f}")
+            print(f"Generalization Gap: {generalization_gap:.4f}")
+            if generalization_gap > 0.1:
+                print("⚠️  Large generalization gap detected - model may be overfitting")
+            elif generalization_gap < -0.05:
+                print("⚠️  Negative generalization gap - possible validation set issues")
+            else:
+                print("✅ Reasonable generalization gap")
+    else:
+        print("\nℹ️  No validation loss available for generalization assessment")
+        print("Consider increasing validation set size or checking data splits")
