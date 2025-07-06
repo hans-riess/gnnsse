@@ -4,6 +4,8 @@ from ssegnn.graph import NodeSplitMask, TemporalGraphNormalize
 from ssegnn.model import ClassifierGCN
 from ssegnn.dataloader import DataLoader
 from ssegnn.signature import SignatureFeatures, RandomFeatures
+from ssegnn.visualization import calculate_classification_metrics
+import numpy as np
 
 
 def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
@@ -102,6 +104,7 @@ def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
     train_losses = []
     train_accuracies = []
     val_accuracies = []
+    val_losses = []
     
     for epoch in range(int(hyper_config['num_epochs'])):
         model.train()
@@ -118,12 +121,18 @@ def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
             train_acc = (pred[static_graph.train_mask] == static_graph.y[static_graph.train_mask]).float().mean().item()
             val_acc = (pred[static_graph.val_mask] == static_graph.y[static_graph.val_mask]).float().mean().item() if static_graph.val_mask.sum() > 0 else float('nan')
             
+            # Calculate validation loss
+            val_loss = criterion(out[static_graph.val_mask], static_graph.y[static_graph.val_mask].long()).item() if static_graph.val_mask.sum() > 0 else float('nan')
+            
             train_losses.append(loss.item())
             train_accuracies.append(train_acc)
             val_accuracies.append(val_acc)
+            val_losses.append(val_loss)
             
         if verbose and epoch % 10 == 0:
-            print(f"Epoch {epoch:03d} | Loss: {loss.item():.4f} | Train Acc: {train_acc:.4f}")
+            val_loss_str = f" | Val Loss: {val_loss:.4f}" if not np.isnan(val_loss) else ""
+            val_acc_str = f" | Val Acc: {val_acc:.4f}" if not np.isnan(val_acc) else ""
+            print(f"Epoch {epoch:03d} | Loss: {loss.item():.4f} | Train Acc: {train_acc:.4f}{val_loss_str}{val_acc_str}")
 
     # Test evaluation
     model.eval()
@@ -131,11 +140,20 @@ def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
         out = model(static_graph.x, static_graph.edge_index, static_graph.edge_attr)
         pred = out.argmax(dim=1)
         test_acc = (pred[static_graph.test_mask] == static_graph.y[static_graph.test_mask]).float().mean().item() if static_graph.test_mask.sum() > 0 else float('nan')
+        
+        # Extract test predictions and labels for detailed analysis
+        test_predictions = pred[static_graph.test_mask].cpu().numpy()
+        test_labels = static_graph.y[static_graph.test_mask].cpu().numpy()
+        
+        # Calculate comprehensive metrics
+        test_metrics = calculate_classification_metrics(test_labels, test_predictions)
     
     if verbose:
         print(f"Test Accuracy: {test_acc:.4f}")
+        print(f"Test F1 Score (weighted): {test_metrics['f1_weighted']:.4f}")
+        print(f"Test F1 Score (macro): {test_metrics['f1_macro']:.4f}")
     
-    # Return results
+    # Return results including predictions and additional metrics
     results = {
         'test_accuracy': test_acc,
         'final_train_accuracy': train_accuracies[-1] if train_accuracies else 0.0,
@@ -144,7 +162,13 @@ def train(data_config, hyper_config, device='cpu', verbose=False, debug=False):
         'train_accuracies': train_accuracies,
         'val_accuracies': val_accuracies,
         'train_losses': train_losses,
-        'num_epochs': len(train_losses)
+        'val_losses': val_losses,
+        'num_epochs': len(train_losses),
+        # Add test predictions and labels for visualization
+        'test_predictions': test_predictions.tolist(),
+        'test_labels': test_labels.tolist(),
+        # Add comprehensive test metrics
+        **{f"test_{k}": v for k, v in test_metrics.items()}
     }
     
-    return results
+    return results, static_graph
